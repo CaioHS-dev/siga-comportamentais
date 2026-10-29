@@ -1,9 +1,9 @@
 package siga;
 
 /** Reação à matrícula. Pronta. */
-public class RegistroAuditoria {
-
-    public void registrar(String operacao, String matriculaAluno) {
-        System.out.println("   [auditoria] " + operacao + " - " + matriculaAluno);
+public class RegistroAuditoria implements OuvinteMatricula {
+    @Override
+    public void aoMatricular(Matricula matricula) {
+        System.out.println("   [auditoria] MATRICULA - " + matricula.getAluno().getMatricula());
     }
 }

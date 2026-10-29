@@ -1,9 +1,9 @@
 package siga;
 
 /** Reação à matrícula. Pronta. */
-public class PainelVagas {
-
-    public void atualizar(String codigoTurma) {
-        System.out.println("   [painel] vagas de " + codigoTurma + " atualizadas");
+public class PainelVagas implements OuvinteMatricula {
+    @Override
+    public void aoMatricular(Matricula matricula) {
+        System.out.println("   [painel] vagas de " + matricula.getCodigoTurma() + " atualizadas");
     }
 }
