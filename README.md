@@ -1,82 +1,29 @@
-# SIGA — Atividade de padrões comportamentais: Strategy e Observer (código inicial)
+# Documentação de Refatoração: Padrões Strategy e Observer (SIGA)
 
-**Técnicas de Programação II (TP2) · Aula 12** — CST em Desenvolvimento de Software Multiplataforma · Fatec de Porto Ferreira
+## 1. Correção das Regras de Desconto (Padrão Strategy)
 
-Este é o **código inicial** da atividade prática da Aula 12. Ele compila e executa — e, desta vez, a saída já mostra um aluno pagando **dois valores diferentes** pela mesma matrícula. São **dois deslizes**, e cada um dos padrões da aula resolve um deles.
+* O método `calcularValor` em `Matricula` e o método `calcularValorDoBoleto` em `GeradorBoleto` aplicavam os descontos baseados no perfil do aluno usando estruturas condicionais (`if/else`). Além da repetição de código, havia uma divergência: a classe de matrícula aplicava 10% de desconto para egressos, enquanto o gerador de boletos parava no desconto de servidor. Isso causou um erro financeiro, fazendo com que a aluna Ana Pereira pagasse R$ 720,00 na matrícula e R$ 800,00 no boleto.
 
-## Estrutura do projeto
+*Para eliminar os `ifs` e centralizar os cálculos, implementei o padrão **Strategy**:
+1. Criei a interface `PoliticaDesconto` com o contrato `double aplicar(double valorBase)` e `String getDescricao()`.
+2. Criei quatro classes dedicadas (`SemDesconto`, `DescontoBolsista`, `DescontoServidor` e `DescontoEgresso`), cada uma encapsulando a fatia matemática correspondente (ex: multiplicando por 0.50, 0.80 ou 0.90).
+3. Na classe `Matricula`, apaguei todas as condicionais, passei a injetar a política via construtor e apenas deleguei o cálculo: `politica.aplicar(valorBase)`.
+4. Na classe `GeradorBoleto`, removi o cálculo manual e passei a receber a instância de `Matricula`, chamando o método de cálculo nela.
 
-```
-siga-comportamentais/
-└── src/
-    └── siga/
-        ├── Aluno.java              (entidade de domínio; pronta)
-        ├── Matricula.java          (cadeia de condicionais — deslize 1A)
-        ├── GeradorBoleto.java      (a mesma cadeia, divergente — deslize 1B)
-        ├── FachadaMatricula.java   (todas as reações embutidas — deslize 2)
-        ├── NotificadorEmail.java   (reação; pronta)
-        ├── PainelVagas.java        (reação; pronta)
-        ├── RegistroAuditoria.java  (reação; pronta)
-        ├── AvisoCoordenacao.java   (reação que falha de propósito; pronta)
-        └── Main.java               (demonstra os dois deslizes)
-```
+* Os percentuais de desconto agora existem em apenas um lugar do projeto, blindando-o contra divergências. Qualquer alteração ou nova política de desconto será feita sem usar a palavra `if` e afetará automaticamente tanto a matrícula quanto o boleto.
 
-## Como compilar e executar
+---
 
-Pré-requisito: JDK 17 ou superior (`java -version` para verificar).
+## 2. Desacoplamento das Reações à Matrícula (Padrão Observer)
 
-```bash
-# 1. Compilar (a saída vai para a pasta "bin")
-javac -encoding UTF-8 -d bin src/siga/*.java
+* A classe `FachadaMatricula` estava acoplada intimamente a quatro serviços diferentes (e-mail, vagas, auditoria e aviso à coordenação). Após registrar o aluno, ela os chamava de forma sequencial. O problema crítico aqui era a falta de proteção: como a falha do aviso à coordenação disparava uma exceção, o processo inteiro travava antes da etapa final, impedindo a auditoria de ser registrada. 
 
-# 2. Executar
-java -cp bin siga.Main
-```
+* Para desvincular a fachada de seus efeitos colaterais e blindar o fluxo, implementei o padrão **Observer**:
+1. Criei a interface `OuvinteMatricula` contendo o método `aoMatricular(Matricula)`.
+2. Adaptei os serviços (`NotificadorEmail`, `PainelVagas`, `RegistroAuditoria` e `AvisoCoordenacao`) para implementarem essa interface.
+3. Criei a classe `PublicadorMatricula` com uma lista interna para registrar os ouvintes. No método de disparo (`publicar`), iterei sobre uma **cópia** da lista e envolvi cada execução num bloco `try-catch` que apenas registra o erro e não interrompe o laço.
+4. Refatorei a `FachadaMatricula` para receber apenas o `PublicadorMatricula` no construtor. Após a matrícula, ela invoca apenas `publicador.publicar(nova)`.
 
-Execute antes de ler o restante deste arquivo: a saída **mostra os dois deslizes acontecendo**.
+* Criei uma quinta reação para estatísticas de ocupação. Inseri a classe no projeto registrando-a no publicador (no `Main`), e comprovei que é possível adicionar um serviço novo sem tocar numa única linha de código da fachada.
 
-## Os dois deslizes propositais
-
-| # | Deslize | Onde | Por que é um problema |
-|---|---|---|---|
-| 1 | **Cadeia de condicionais duplicada e divergente** | `Matricula.calcularValor` e `GeradorBoleto.calcularValorDoBoleto` | É a situação-problema da Aula 3, agora em dois lugares. Quando a política do egresso foi criada, ninguém atualizou o gerador de boletos: **Ana Pereira paga R$ 720,00 na matrícula e R$ 800,00 no boleto**. Cada nova política obriga a alterar e retestar duas classes que já funcionavam. |
-| 2 | **Reações embutidas na fachada** | `FachadaMatricula.matricular` | A fachada conhece as quatro reações a uma matrícula, e a quinta será a quinta alteração nesta classe. Pior: como as chamadas são sequenciais e desprotegidas, a **falha do aviso à coordenação impede a auditoria**, que vinha depois dela. |
-
-> **Atenção ao que NÃO é deslize.** A fachada orquestrar os *passos* da matrícula é papel legítimo dela, estabelecido na Aula 10 — isso não deve ser desfeito. O problema é a lista de *reações* ao fato já consumado. Ao final, a fachada continua existindo, e menor.
-
-## Sua tarefa
-
-Siga as etapas da ficha de atividade prática:
-
-1. **Localizar a divergência.** Identifique as duas cadeias de condicionais e descreva neste README em que ponto exato elas discordam, e qual aluno é afetado.
-2. **Criar as estratégias.** Escreva a interface `PoliticaDesconto`, com `aplicar(double valorBase)` e `getDescricao()`, e as quatro políticas concretas: `SemDesconto`, `DescontoBolsista` (50%), `DescontoServidor` (20%) e `DescontoEgresso` (10%). Cada percentual deve aparecer **uma vez só** no projeto.
-3. **Injetar a estratégia.** Refatore `Matricula` para receber uma `PoliticaDesconto` e delegar a ela, e faça `GeradorBoleto` usar a mesma política da matrícula, em vez da sua própria cadeia. Ao terminar, **nenhum `if` de desconto** deve existir em nenhuma das duas classes.
-4. **Criar o Observer.** Escreva a interface `OuvinteMatricula`, com `aoMatricular(Matricula)`, e a classe `PublicadorMatricula`, com `registrar`, `remover` e `publicar`. Converta as quatro reações em ouvintes. O laço de `publicar` deve percorrer uma **cópia** da lista e **proteger** a chamada de cada ouvinte, de modo que a falha do aviso à coordenação não impeça a auditoria.
-5. **Provar que funciona.** Acrescente uma quinta reação — a estatística de ocupação do curso — sem alterar uma única linha da `FachadaMatricula`.
-
-## Critério de sucesso
-
-Ao final, verifique que: (a) Ana Pereira paga **o mesmo valor** na matrícula e no boleto; (b) cada percentual de desconto aparece em **um único lugar** do projeto; (c) a palavra `if` não aparece em nenhuma regra de desconto; (d) a quinta reação custou **uma classe nova e uma linha de registro**, sem tocar na fachada; e (e) com o aviso à coordenação falhando, a **auditoria continua acontecendo**.
-
-> O item (e) é o que distingue uma implementação de livro de uma que sobrevive em produção. Repare que ele exige, em `publicar`, um `catch` que registra e segue adiante — a única situação em toda a disciplina em que isso é a escolha certa, porque a falha de um ouvinte é problema dele, não dos outros.
-
-## Uma armadilha frequente na etapa 3
-
-É comum o aluno criar as quatro políticas corretamente e, em seguida, escrever dentro de `Matricula` algo assim:
-
-```java
-// ✗ Isto apenas mudou o if de lugar
-if (aluno.isBolsista()) {
-    this.politica = new DescontoBolsista();
-} else if (aluno.isServidor()) {
-    ...
-}
-```
-
-A matrícula voltou a decidir. Quem escolhe a política é **quem monta a matrícula** — no `Main`, ou em uma classe de fábrica, se a equipe preferir. A `Matricula` apenas recebe e delega.
-
-## Padrão de entrega
-
-Conforme a ficha de atividade prática: identificadores em português, um arquivo `.java` por classe pública, código formatado, entrega no repositório Git com README e commits descritivos. O uso de IA para gerar o código é proibido nesta atividade (ver seção 5.3 da ficha).
-
-> **Projeto Integrador:** a Etapa 2 vence na **próxima aula (21/10)** e exige um padrão estrutural e um comportamental, ambos justificados. O que você produzir aqui pode ser aproveitado — o Strategy costuma ser a escolha mais segura, porque quase todo projeto tem uma regra que varia. Para o Observer, confirme antes que há de fato mais de uma reação ao acontecimento: uma lista de observadores com um elemento é uma lista que não precisava existir.
+* A fachada voltou a ter a sua responsabilidade única (orquestrar os passos antes e durante a matrícula). As reações após a matrícula agora são tratadas como eventos independentes, isolados e resilientes a falhas de terceiros.
