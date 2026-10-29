@@ -18,22 +18,17 @@ import java.util.List;
 public class FachadaMatricula {
 
     private final List<Matricula> armazem = new ArrayList<>();
+    private final PublicadorMatricula publicador;
 
-    private final NotificadorEmail notificadorEmail = new NotificadorEmail();
-    private final PainelVagas painelVagas = new PainelVagas();
-    private final RegistroAuditoria registroAuditoria = new RegistroAuditoria();
-    private final AvisoCoordenacao avisoCoordenacao = new AvisoCoordenacao();
+    public FachadaMatricula(PublicadorMatricula publicador) {
+        this.publicador = publicador;
+    }
 
-    public Matricula matricular(Aluno aluno, String codigoTurma, boolean turmaLotada) {
-        Matricula nova = new Matricula(aluno, codigoTurma);
+    public Matricula matricular(Aluno aluno, String codigoTurma, PoliticaDesconto politica) {
+        Matricula nova = new Matricula(aluno, codigoTurma, politica);
         armazem.add(nova);
 
-        notificadorEmail.enviarConfirmacao(nova);
-        painelVagas.atualizar(codigoTurma);
-        if (turmaLotada) {
-            avisoCoordenacao.enviar(codigoTurma);
-        }
-        registroAuditoria.registrar("MATRICULA", aluno.getMatricula());
+        publicador.publicar(nova);
 
         return nova;
     }
