@@ -9,17 +9,9 @@ package siga;
  */
 public class GeradorBoleto {
 
-    public double calcularValorDoBoleto(Aluno aluno, double valorBase) {
-        if (aluno.isBolsista()) {
-            return valorBase * 0.50;
-        } else if (aluno.isServidor()) {
-            return valorBase * 0.80;
-        }
-        return valorBase;   // o desconto de egresso nunca chegou aqui
-    }
-
-    public void emitir(Aluno aluno, double valorBase) {
-        double valor = calcularValorDoBoleto(aluno, valorBase);
-        System.out.printf("   [boleto] %s: R$ %.2f%n", aluno.getNome(), valor);
+    public void emitir(Matricula matricula, double valorBase) {
+        // Agora o boleto extrai o valor exato da matrícula, eliminando o Deslize 1
+        double valor = matricula.calcularValor(valorBase);
+        System.out.printf("   [boleto] %s: R$ %.2f%n", matricula.getAluno().getNome(), valor);
     }
 }
